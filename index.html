@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MicMind - סטנדאפ קול</title>
+  <style>
+    body { font-family: 'Assistant', sans-serif; background: #f7f7f7; color: #2d3436; direction: rtl; text-align: center; padding: 30px; }
+    .container { max-width: 600px; margin: auto; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    textarea, select, input { width: 100%; margin-top: 10px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; box-sizing: border-box; }
+    button { width: 100%; padding: 12px; font-size: 16px; border: none; border-radius: 8px; margin-top: 10px; cursor: pointer; }
+    .record-btn { background-color: #d63031; color: white; font-size: 24px; border-radius: 50%; width: 80px; height: 80px; margin: 10px auto; display: block; }
+    .recording { background-color: #00b894 !important; }
+    .idea-item { text-align: right; background: #f1f2f6; padding: 10px; border-radius: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MicMind 🎤</h1>
+    <button id="recordBtn" class="record-btn">🎤</button>
+    <div id="timer">00:00</div>
+    <select id="category">
+      <option value="אחר">אחר</option>
+      <option>זוגיות</option>
+      <option>צבא</option>
+      <option>ילדים</option>
+      <option>דת</option>
+      <option>פוליטיקה</option>
+      <option>הייטק</option>
+    </select>
+    <textarea id="transcription" rows="4" placeholder="תמלול או רעיון..."></textarea>
+    <input id="tags" placeholder="תגיות מופרדות בפסיקים" />
+    <button onclick="saveIdea()">💾 שמור רעיון</button>
+    <button onclick="shareWhatsApp()">📤 שלח ב־WhatsApp</button>
+    <button onclick="exportIdeas()">📄 ייצוא</button>
+    <input type="text" id="searchBar" placeholder="🔎 חפש רעיון..." oninput="loadIdeas()" />
+    <div id="ideasList"><h3>רעיונות שמורים:</h3></div>
+  </div>
+
+<script>
+let isRecording = false, seconds = 0, timer;
+const btn = document.getElementById('recordBtn'), transcription = document.getElementById('transcription'), timerEl = document.getElementById('timer');
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'he-IL'; recognition.interimResults = false;
+
+  recognition.onstart = () => { seconds = 0; updateTime(); timer = setInterval(() => { seconds++; updateTime(); }, 1000); };
+  recognition.onend = () => { clearInterval(timer); btn.classList.remove('recording'); isRecording = false; };
+  recognition.onresult = e => { transcription.value += e.results[0][0].transcript + "\n"; };
+
+  btn.onclick = () => {
+    if (!isRecording) { recognition.start(); btn.classList.add('recording'); isRecording = true; }
+    else { recognition.stop(); }
+  };
+}
+
+function updateTime() {
+  timerEl.innerText = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+}
+
+function saveIdea() {
+  const ideas = JSON.parse(localStorage.getItem('standupIdeas') || '[]');
+  ideas.push({
+    text: transcription.value.trim(),
+    category: document.getElementById('category').value,
+    tags: document.getElementById('tags').value.trim(),
+    date: new Date().toLocaleString('he-IL')
+  });
+  localStorage.setItem('standupIdeas', JSON.stringify(ideas));
+  transcription.value = ''; document.getElementById('tags').value = '';
+  loadIdeas();
+}
+
+function loadIdeas() {
+  const ideas = JSON.parse(localStorage.getItem('standupIdeas') || '[]');
+  const search = document.getElementById('searchBar').value.toLowerCase();
+  const list = document.getElementById('ideasList');
+  list.innerHTML = "<h3>רעיונות שמורים:</h3>";
+  ideas.filter(i => i.text.toLowerCase().includes(search) || i.tags.toLowerCase().includes(search)).reverse().forEach((idea, i) => {
+    const div = document.createElement('div');
+    div.className = 'idea-item';
+    div.innerHTML = `<b>${idea.category}</b><br><em>${idea.date}</em><br>${idea.text}<br><small>${idea.tags}</small>`;
+    list.appendChild(div);
+  });
+}
+
+function exportIdeas() {
+  const ideas = JSON.parse(localStorage.getItem('standupIdeas') || '[]');
+  const content = ideas.map(i => `קטגוריה: ${i.category}\nתאריך: ${i.date}\nתגיות: ${i.tags}\n${i.text}\n--------`).join('\n');
+  const blob = new Blob([content], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'micmind_ideas.txt';
+  link.click();
+}
+
+function shareWhatsApp() {
+  const text = transcription.value.trim();
+  const cat = document.getElementById('category').value;
+  if (!text) return alert("אין תוכן לשליחה.");
+  const msg = `קטגוריה: ${cat}\n${text}`;
+  const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
+window.onload = loadIdeas;
+</script>
+</body>
+</html>
